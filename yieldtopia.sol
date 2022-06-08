@@ -332,13 +332,13 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
 
     // Default Buy Tax Fees = 8%
     uint256 public buyliquidityFee = 2; // $YIELD Liquidity Pool Growth
-    uint256 public buyreserveFee = 3; // Yield Protocol Royalty Reserves
+    uint256 public buyreserveFee = 3; // Yield Protocol Reward Reserves
     uint256 public buytreasuryFee = 3; // Funding Marketing & Development
     uint256 public totalBuyFee = buyliquidityFee.add(buyreserveFee).add(buytreasuryFee);
 
     // Default Sell Tax Fees = 12%
     uint256 public sellliquidityFee = 3; // $YIELD Liquidity Pool Growth
-    uint256 public sellreserveFee = 5; // Yield Protocol Royalty Reserves
+    uint256 public sellreserveFee = 5; // Yield Protocol Reward Reserves
     uint256 public selltreasuryFee = 4; // Funding Marketing & Development
     uint256 public totalSellFee = sellliquidityFee.add(sellreserveFee).add(selltreasuryFee);
 
@@ -351,7 +351,7 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
 
     // Default Fee Receivers Settings
     address public yieldtopiatreasuryReceiver = 0x97f351c6E87af8941AE6cAF0465254c14Ac65Ffb;
-    address public yieldroyaltyreservesReceiver = 0x33416de3a0473A0a3eD8c179f45993281b21dB80;
+    address public yieldrewardreservesReceiver = 0x33416de3a0473A0a3eD8c179f45993281b21dB80;
     address public yieldliquidityReceiver = msg.sender;
     address public busdToken = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;
     address DEADWalletAddress = 0x000000000000000000000000000000000000dEaD;
@@ -414,7 +414,7 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
         _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
 
         _isFeeExempt[yieldtopiatreasuryReceiver] = true;
-        _isFeeExempt[yieldroyaltyreservesReceiver] = true;
+        _isFeeExempt[yieldrewardreservesReceiver] = true;
         _isFeeExempt[address(this)] = true;
         _isFeeExempt[msg.sender] = true;
 
@@ -671,7 +671,7 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
         }
 
         if(amountToReserve > 0){
-            _swapTokensForBusd(amountToReserve, yieldroyaltyreservesReceiver);
+            _swapTokensForBusd(amountToReserve, yieldrewardreservesReceiver);
         }
 
         if(amountToTreasury > 0){
@@ -824,17 +824,17 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
     }
 
     // Set Wallet & Contract Addresses To Receieve Transaction Tax Fees
-    function setFeeReceivers(address _yieldliquidityReceiver, address _yieldtopiatreasuryReceiver, address _yieldroyaltyreservesReceiver) external onlyOwner {
+    function setFeeReceivers(address _yieldliquidityReceiver, address _yieldtopiatreasuryReceiver, address _yieldrewardreservesReceiver) external onlyOwner {
         yieldliquidityReceiver = _yieldliquidityReceiver;
         yieldtopiatreasuryReceiver = _yieldtopiatreasuryReceiver;
-        yieldroyaltyreservesReceiver = _yieldroyaltyreservesReceiver;
+        yieldrewardreservesReceiver = _yieldrewardreservesReceiver;
     }
 
     // Set Buy Transactions Tax Fees
     function setBuyFees(uint256 _buyliquidityFee, uint256 _buyreserveFee, uint256 _buytreasuryFee, uint256 _feeDenominator) external onlyOwner {
         require(
             _buyliquidityFee <= MAX_FEE_RATE && // $YIELD Liquidity Pool Growth
-            _buyreserveFee <= MAX_FEE_RATE && // Yield Protocol Royalty Reserves
+            _buyreserveFee <= MAX_FEE_RATE && // Yield Protocol Reward Reserves
             _buytreasuryFee <= MAX_FEE_RATE, // Funding Marketing & Development
             "wrong"
         );
@@ -850,7 +850,7 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
      function setSellFees(uint256 _sellliquidityFee, uint256 _sellreserveFee, uint256 _selltreasuryFee, uint256 _feeDenominator) external onlyOwner {
         require(
             _sellliquidityFee <= MAX_FEE_RATE && // $YIELD Liquidity Pool Growth
-            _sellreserveFee <= MAX_FEE_RATE && // Yield Protocol Royalty Reserves
+            _sellreserveFee <= MAX_FEE_RATE && // Yield Protocol Reward Reserves
             _selltreasuryFee <= MAX_FEE_RATE, // Funding Marketing & Development
             "wrong"
         );
