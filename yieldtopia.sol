@@ -315,12 +315,13 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
 
     // Yield Protocol Settings
     uint256 private constant MAX_REBASE_FREQUENCY = 1800;
-    uint256 public rewardYield = 4200690;
+    uint256 public rewardYield = 3830800; // APY: 42,069% && DPY: 1.6%
     uint256 public rewardYieldDenominator = 10000000000;
     uint256 public maxSellTransactionAmount = 2500000 * 10 ** 18; 
     uint256 public rebaseFrequency = 1800;
-    uint256 public nextRebase = block.timestamp + 604800;
-    bool public autoRebase = false;
+    uint256 public nextRebase = 1657870200; 
+    uint256 public nexthalving = 1657870200 + 2629743; // one month after the approximate launch date & first rebate
+    bool public autoRebase = true;
 
     // $YIELD Token Settings
     uint256 private constant DECIMALS = 18;
@@ -330,32 +331,93 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
     uint256 private constant MAX_SUPPLY = ~uint128(0);
     bool public liquifyAll = false;
 
-    // Default Buy Tax Fees = 8%
+    // Default Buy Tax Fees = 9%
     uint256 public buyliquidityFee = 2; // $YIELD Liquidity Pool Growth
-    uint256 public buyreserveFee = 3; // Yield Protocol Reward Reserves
-    uint256 public buytreasuryFee = 3; // Funding Marketing & Development
-    uint256 public totalBuyFee = buyliquidityFee.add(buyreserveFee).add(buytreasuryFee);
+    uint256 public buyreserveFee = 3; // Insurance: Reserve fee aka insurance fund to make buy-backs with as needed
+    uint256 public buytreasuryFee = 3; // Treasury: Marketing & Development [community involvment via GOV]
+    uint256 public buyfirepitfee = 1; // Firepit: Used to burn $YIELD tokens out of the supply
+    uint256 public totalBuyFee = buyliquidityFee.add(buyreserveFee).add(buytreasuryFee).add(buyfirepitfee);
 
-    // Default Sell Tax Fees = 12%
+    // Default Sell Tax Fees = 13%
     uint256 public sellliquidityFee = 3; // $YIELD Liquidity Pool Growth
-    uint256 public sellreserveFee = 5; // Yield Protocol Reward Reserves
-    uint256 public selltreasuryFee = 4; // Funding Marketing & Development
-    uint256 public totalSellFee = sellliquidityFee.add(sellreserveFee).add(selltreasuryFee);
+    uint256 public sellreserveFee = 5; // Insurance: Reserve fee aka insurance fund to make buy-backs with as needed
+    uint256 public selltreasuryFee = 4; // Treasury: Marketing & Development [community involvment via GOV]
+    uint256 public sellfirepitfee = 1; // Firepit: Used to burn $YIELD tokens out of the supply
+    uint256 public totalSellFee = sellliquidityFee.add(sellreserveFee).add(selltreasuryFee).add(sellfirepitfee);
+
+    // Default Referral Settings
+    uint256 public referee = 1; // $YIELD Liquidity Pool Growth
+    uint256 public referrer = 1; // Insurance: Reserve fee aka insurance fund to make buy-backs with as needed
+    uint256 public totalReferralFee = referee.add(referrer);
 
     // Transaction Tax Fees Settings
-    bool public feesOnNormalTransfers = false;
+    bool public feesOnNormalTransfers = true;
     mapping(address => bool) _isFeeExempt;
     uint256 public constant MAX_FEE_RATE = 20;
     uint256 public feeDenominator = 100;
     uint256 public transferTax = 100; // No transfers in between wallets
 
     // Default Fee Receivers Settings
-    address public yieldtopiatreasuryReceiver = 0x97f351c6E87af8941AE6cAF0465254c14Ac65Ffb;
-    address public yieldrewardreservesReceiver = 0x33416de3a0473A0a3eD8c179f45993281b21dB80;
-    address public yieldliquidityReceiver = msg.sender;
+    address public yieldtopiatreasuryReceiver = 0xdd7d29eb51Dd00eAc9e445F7D6f52b654fC235F0;
+    address public yieldrewardreservesReceiver = 0xF0B821A558246aFCa77140B8746354Efac65368C;
+    address public yieldliquidityReceiver = 0x5f045F69C73322cDC49b50d6Aa5BB5d783302E8e;
+    address public yieldfirepit = 0xE57B595F18744742d0c077215B2cB3bc78B9e6fe;
     address public busdToken = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;
     address DEADWalletAddress = 0x000000000000000000000000000000000000dEaD;
     address ZEROWalletAddress = 0x0000000000000000000000000000000000000000;
+
+    // Referral System
+    mapping(address => address) public downlineLookupUpline;
+	mapping(address => address[]) public Downlines;
+    mapping(address => uint256) public referralTotalFeeReceived;
+    mapping(address => uint256) public referralCount;
+    mapping(uint256 => address) public uplineList;
+    uint256 public iTotalUplines = 0;
+    
+    function getTotalUpline() public view returns (uint256) {
+        return iTotalUplines;
+    }
+
+    function getUplineAddressByIndex(uint256 iIndex) public view returns (address){
+        return uplineList[iIndex];
+    } 
+
+    function addMember(address uplineAddress, address downlineAddress) external onlyOwner{
+        downlineLookupUpline[downlineAddress] = uplineAddress;
+    }
+
+    function approveReferral(address uplineAddress) external {
+        require(downlineLookupUpline[msg.sender] == address(0), "You have already been referred");
+        require(msg.sender != uplineAddress, "You cannot refer yourself");
+        downlineLookupUpline[msg.sender] = uplineAddress;
+		Downlines[uplineAddress].push(msg.sender);
+        
+        if(referralCount[uplineAddress] == 0)
+        {
+            uplineList[iTotalUplines] = uplineAddress;
+            iTotalUplines += 1;
+        }
+
+        referralCount[uplineAddress] += 1;
+    }
+    
+    function getUpline(address sender) public view returns (address){
+        return downlineLookupUpline[sender];
+    }
+
+    function getDownlines(address sender) public view returns (address  [] memory){
+        return Downlines[sender];
+    }
+	
+    function addReferralFee(address receiver, uint256 amount) public {
+        referralTotalFeeReceived[receiver] += amount;
+    }
+
+    function getReferralTotalFee(address receiver) public view returns (uint256){
+        return referralTotalFeeReceived[receiver];
+    }
+
+
 
     // $YIELD LP Settings
     bool public isLiquidityInBnb = true;
@@ -395,6 +457,7 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
 
     mapping(address => uint256) private _gonBalances;
     mapping(address => mapping(address => uint256)) private _allowedFragments;
+    mapping(address => bool) public blacklist;
 
     constructor() ERC20Detailed("YieldTopia", "YIELD", uint8(DECIMALS)) {
         router = IDEXRouter(0x10ED43C718714eb63d5aA57B78B54704E256024E);
@@ -429,6 +492,25 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
 
     function totalSupply() external view override returns (uint256) {
         return _totalSupply;
+    }
+
+    function isContract(address addr) internal view returns (bool) {
+        uint size;
+        assembly { size := extcodesize(addr) }
+        return size > 0;
+    }
+
+    function setBotBlacklist(address _botAddress, bool _flag) external onlyWhitelisted {
+        require(isContract(_botAddress), "Only contract address, not allowed externally owned account");
+        blacklist[_botAddress] = _flag;    
+    }
+    
+    function noDecimaltotalSupply() external view returns (uint256) {
+        return _totalSupply.div(10**DECIMALS);
+    }
+
+    function nodecimalCirculatingSUpply() external view returns (uint256) {
+        return getCirculatingSupply().div(10**DECIMALS);
     }
 
     function allowance(address owner_, address spender) external view override returns (uint256){
@@ -507,6 +589,7 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
     }
 
     function _transferFrom(address sender, address recipient, uint256 amount) internal returns (bool) {
+        require(!blacklist[sender] && !blacklist[recipient], "in_blacklist");
         bool excludedAccount = _isFeeExempt[sender] || _isFeeExempt[recipient];
         if (
             automatedMarketMakerPairs[recipient] &&
@@ -517,14 +600,14 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
             uint blkTime = block.timestamp;
           
             uint256 onePercent = balanceOf(sender).mul(txfee).div(100); 
-            require(amount <= onePercent, "ERR: Can't sell more than 1%");
+            require(amount <= onePercent, "ERR: Can't sell more than set 1%-20%");
 
-            if( blkTime > tradeData[sender].lastTradeTime + TwentyFourhours) {
+            if( blkTime >= tradeData[sender].lastTradeTime + TwentyFourhours) {
                 tradeData[sender].lastTradeTime = blkTime;
                 tradeData[sender].tradeAmount = amount;
             }
-            else if( (blkTime < tradeData[sender].lastTradeTime + TwentyFourhours) && (( blkTime > tradeData[sender].lastTradeTime)) ){
-                require(tradeData[sender].tradeAmount + amount <= onePercent, "ERR: Can't sell more than 1% in One day");
+            else if( (blkTime <= tradeData[sender].lastTradeTime + TwentyFourhours) && (( blkTime >= tradeData[sender].lastTradeTime)) ){
+                require(tradeData[sender].tradeAmount + amount <= onePercent, "ERR: Can't sell more than set 1%-20% in One day");
                 tradeData[sender].tradeAmount = tradeData[sender].tradeAmount + amount;
             }
         }
@@ -664,8 +747,10 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
 
         uint256 amountToLiquify = contractTokenBalance.mul(dynamicLiquidityFee.mul(2)).div(realTotalFee);
         uint256 amountToReserve = contractTokenBalance.mul(buyreserveFee.add(sellreserveFee)).div(realTotalFee);
-        uint256 amountToTreasury = contractTokenBalance.sub(amountToLiquify).sub(amountToReserve);
+        uint256 amountToFirepit = contractTokenBalance.mul(buyfirepitfee.add(sellfirepitfee)).div(realTotalFee);
+        uint256 amountToTreasury = contractTokenBalance.sub(amountToLiquify).sub(amountToReserve).sub(amountToFirepit);
 
+    
         if(amountToLiquify > 0){
             _swapAndLiquify(amountToLiquify);
         }
@@ -678,11 +763,18 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
             _swapTokensForBNB(amountToTreasury, yieldtopiatreasuryReceiver);
         }
 
-        emit SwapBack(contractTokenBalance, amountToLiquify, amountToReserve, amountToTreasury);
-    }
+         if(amountToFirepit > 0){
+            _swapTokensForBNB(amountToFirepit, yieldfirepit);
+        }
 
+        emit SwapBack(contractTokenBalance, amountToLiquify, amountToReserve, amountToTreasury, amountToFirepit);
+    }
+ 
     function takeFee(address sender, address recipient, uint256 gonAmount) internal returns (uint256){
         uint256 _realFee = totalBuyFee;
+        uint256 _buytreasuryFee = buytreasuryFee;
+        uint256 _selltreasuryFee = selltreasuryFee;
+
         if(automatedMarketMakerPairs[recipient]) _realFee = totalSellFee;
 
         uint256 feeAmount = gonAmount.mul(_realFee).div(feeDenominator);
@@ -690,6 +782,35 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
         if(!automatedMarketMakerPairs[sender] && !automatedMarketMakerPairs[recipient]) {
 			require(transferTax <= 99, "Wallet to wallet transfer disabled");
 			feeAmount = gonAmount.mul(transferTax).div(100);			
+        }
+
+        // referrals
+        if (automatedMarketMakerPairs[sender]) {
+            address UplineAddressBuyer = getUpline(recipient);
+            if (UplineAddressBuyer != address(0))
+            {      
+                _buytreasuryFee -= totalReferralFee;
+                uint256 _uplineBuyerReward = gonAmount.div(feeDenominator).mul(referrer);
+                feeAmount = gonAmount.div(feeDenominator).mul(_realFee - referee);
+                _gonBalances[UplineAddressBuyer] = _gonBalances[UplineAddressBuyer].add(
+                _uplineBuyerReward
+                );
+                addReferralFee(UplineAddressBuyer, _uplineBuyerReward.div(_gonsPerFragment) );  
+            }      
+        }
+        else if (automatedMarketMakerPairs[recipient]) {
+            address UplineAddress = getUpline(sender);
+
+            if (UplineAddress != address(0))
+            {
+                _selltreasuryFee -= totalReferralFee;
+                uint256 _uplineReward = gonAmount.div(feeDenominator).mul(referrer);
+                feeAmount = gonAmount.div(feeDenominator).mul(_realFee - referee);
+                _gonBalances[UplineAddress] = _gonBalances[UplineAddress].add(
+                    _uplineReward
+                );
+                addReferralFee(UplineAddress, _uplineReward.div(_gonsPerFragment) );
+            }    
         }
 
         _gonBalances[address(this)] = _gonBalances[address(this)].add(feeAmount);
@@ -756,6 +877,12 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
         if (_totalSupply > MAX_SUPPLY) {
             _totalSupply = MAX_SUPPLY;
         }
+
+        if (block.timestamp >= nexthalving) {
+            rewardYield = rewardYield.div(10).mul(9);
+            nexthalving = block.timestamp + 2629743;
+        }
+        
         _gonsPerFragment = TOTAL_GONS.div(_totalSupply);
         nextRebase = epoch + rebaseFrequency;
         emit LogRebase(epoch, _totalSupply);
@@ -794,8 +921,6 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
         emit SetAutomatedMarketMakerPair(_pair, _value);
     }
  
- 
-
     function setFeeExempt(address _addr, bool _value) external onlyOwner {
         require(_isFeeExempt[_addr] != _value, "Not changed");
         _isFeeExempt[_addr] = _value;
@@ -824,16 +949,38 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
     }
 
     // Set Wallet & Contract Addresses To Receieve Transaction Tax Fees
-    function setFeeReceivers(address _yieldliquidityReceiver, address _yieldtopiatreasuryReceiver, address _yieldrewardreservesReceiver) external onlyOwner {
+    function setFeeReceivers(address _yieldliquidityReceiver, address _yieldtopiatreasuryReceiver, address _yieldrewardreservesReceiver, address _yieldfirepit) external onlyOwner {
         yieldliquidityReceiver = _yieldliquidityReceiver;
         yieldtopiatreasuryReceiver = _yieldtopiatreasuryReceiver;
         yieldrewardreservesReceiver = _yieldrewardreservesReceiver;
+        yieldfirepit = _yieldfirepit;
+    }
+
+
+    // Set Stablecoin (default: BUSD, optional to switch to USDY or other stablecoin in the future)
+    function setStableCoin(address _stablecoin) external onlyOwner {
+        busdToken = _stablecoin;
+    }
+
+
+    // Set Referral Fee Settings (The portion that's deducted from treasury in case of a referral)
+    function setReferralSettings(uint256 _referee, uint256 _referrer, uint256 _feeDenominator) external onlyOwner {
+        require(
+            _referee.add(_referrer) <= buytreasuryFee, // checking that the referral fee is not higher than the treasury fee
+            "wrong"
+        );
+        referee = _referee;
+        referrer = _referrer;
+        totalReferralFee = referee.add(referrer);
+        feeDenominator = _feeDenominator;
+        require(totalReferralFee < feeDenominator / 4);
     }
 
     // Set Buy Transactions Tax Fees
-    function setBuyFees(uint256 _buyliquidityFee, uint256 _buyreserveFee, uint256 _buytreasuryFee, uint256 _feeDenominator) external onlyOwner {
+    function setBuyFees(uint256 _buyliquidityFee, uint256 _buyreserveFee, uint256 _buytreasuryFee, uint256 _buyfirepitfee, uint256 _feeDenominator) external onlyOwner {
         require(
             _buyliquidityFee <= MAX_FEE_RATE && // $YIELD Liquidity Pool Growth
+            _buyfirepitfee <= MAX_FEE_RATE && // $YIELD Liquidity Pool Growth
             _buyreserveFee <= MAX_FEE_RATE && // Yield Protocol Reward Reserves
             _buytreasuryFee <= MAX_FEE_RATE, // Funding Marketing & Development
             "wrong"
@@ -841,23 +988,26 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
         buyliquidityFee = _buyliquidityFee;
         buyreserveFee = _buyreserveFee;
         buytreasuryFee = _buytreasuryFee;
-        totalBuyFee = buyliquidityFee.add(buytreasuryFee).add(buyreserveFee);
+        buyfirepitfee = _buyfirepitfee;
+        totalBuyFee = buyliquidityFee.add(buytreasuryFee).add(buyreserveFee).add(buyfirepitfee);
         feeDenominator = _feeDenominator;
         require(totalBuyFee < feeDenominator / 4);
     }
 
     // Set Sell Transactions Tax Fees
-     function setSellFees(uint256 _sellliquidityFee, uint256 _sellreserveFee, uint256 _selltreasuryFee, uint256 _feeDenominator) external onlyOwner {
+     function setSellFees(uint256 _sellliquidityFee, uint256 _sellreserveFee, uint256 _selltreasuryFee, uint256 _sellfirepitfee, uint256 _feeDenominator) external onlyOwner {
         require(
             _sellliquidityFee <= MAX_FEE_RATE && // $YIELD Liquidity Pool Growth
+            _sellfirepitfee <= MAX_FEE_RATE && // $YIELD Liquidity Pool Growth
             _sellreserveFee <= MAX_FEE_RATE && // Yield Protocol Reward Reserves
             _selltreasuryFee <= MAX_FEE_RATE, // Funding Marketing & Development
             "wrong"
         );
+        sellfirepitfee = _sellfirepitfee;
         sellliquidityFee = _sellliquidityFee;
         sellreserveFee = _sellreserveFee;
         selltreasuryFee = _selltreasuryFee;
-        totalSellFee = sellliquidityFee.add(sellreserveFee).add(selltreasuryFee);
+        totalSellFee = sellliquidityFee.add(sellreserveFee).add(selltreasuryFee).add(sellfirepitfee);
         feeDenominator = _feeDenominator;
         require(totalSellFee < feeDenominator / 4);
     }
@@ -906,11 +1056,11 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
 
     // Set the max sell transaction - must be above the minimum amount
     function setMaxSellTransaction(uint256 _maxTxn) external onlyOwner {
-        require(_maxTxn >= (2500000 * 10 ** 18), "The max sell amount should be above the minimum amount");
+        require(_maxTxn >= (2500000 * (10 ** 18)), "The max sell amount should be above the minimum amount");
         maxSellTransactionAmount = _maxTxn;
     }
 
-    event SwapBack(uint256 contractTokenBalance,uint256 amountToLiquify,uint256 amountToReserve,uint256 amountToTreasury);
+    event SwapBack(uint256 contractTokenBalance,uint256 amountToLiquify,uint256 amountToReserve,uint256 amountToTreasury,uint256 amountToFirepit);
     event SwapAndLiquify(uint256 tokensSwapped, uint256 bnbReceived, uint256 tokensIntoLiqudity);
     event SwapAndLiquifyBusd(uint256 tokensSwapped, uint256 busdReceived, uint256 tokensIntoLiqudity);
     event LogRebase(uint256 indexed epoch, uint256 totalSupply);
