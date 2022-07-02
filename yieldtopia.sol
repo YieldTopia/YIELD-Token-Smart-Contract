@@ -1,4 +1,7 @@
 
+// YieldTopia Finance
+// https://yieldtopia.finance
+
 // SPDX-License-Identifier: MIT
 
 pragma solidity 0.7.6;
@@ -361,7 +364,7 @@ contract YieldTopia is ERC20Detailed, Ownable, WhitelistedRole {
     address public yieldtopiatreasuryReceiver = 0xdd7d29eb51Dd00eAc9e445F7D6f52b654fC235F0;
     address public yieldrewardreservesReceiver = 0xF0B821A558246aFCa77140B8746354Efac65368C;
     address public yieldliquidityReceiver = 0x5f045F69C73322cDC49b50d6Aa5BB5d783302E8e;
-    address public yieldfirepit = 0xE57B595F18744742d0c077215B2cB3bc78B9e6fe;
+    address public yieldfirepit = 0x8421d1560140ad03449df4A66338a7b26Aa380C5;
     address public busdToken = 0xe9e7CEA3DedcA5984780Bafc599bD69ADd087D56;
     address DEADWalletAddress = 0x000000000000000000000000000000000000dEaD;
     address ZEROWalletAddress = 0x0000000000000000000000000000000000000000;
