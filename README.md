@@ -9,7 +9,7 @@
 <img src="https://files.gitbook.com/v0/b/gitbook-x-prod.appspot.com/o/spaces%2FK2ZJ3HiSfjzpYCqnaUpG%2Fuploads%2FKwF9L5DeIn17z1DFX3RE%2Fsdsd.png?alt=media&token=7fd856c6-5d3d-41f9-9f5e-11c20dcbd56e">
 
 ## $YIELD Contract Address:
-0x61B0a06FBd5eD569AD901144AD4AA27B303fc3d0
+0xA3a3D699B0a3a027d32C8d5040352ddE1b8A8106
 
 ### Want To Learn More?
 - Website: https://YieldTopia.finance
@@ -20,7 +20,6 @@
 - Twitter: https://twitter.com/YieldTopia
 
 ### How To Buy $YIELD Token? 
-- First Opportunity: Presale on July 6-8
-- Second Opportunity: IDO on July 11
-- Secondary Markets (DEXs): July 11~+
-
+- First Opportunity: Presale on July 13-15
+- Second Opportunity: IDO on July 18
+- Secondary Markets (DEXs): July 18~+
