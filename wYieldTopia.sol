@@ -155,9 +155,9 @@ library SafeERC20 {
 
 contract wYieldTopia is IAnyswapV3ERC20, Ownable {
     using SafeERC20 for IERC20;
-    string public name = "Wrapped YieldTopia";
-    string public symbol = "wYIELD";
-    uint8  public immutable override decimals = 18;
+    string public name;
+    string public symbol;
+    uint8  public immutable override decimals;
 
     address public immutable underlying;
 
@@ -222,7 +222,26 @@ contract wYieldTopia is IAnyswapV3ERC20, Ownable {
     /// @dev Records number of AnyswapV3ERC20 token that account (second) will be allowed to spend on behalf of another account (first) through {transferFrom}.
     mapping (address => mapping (address => uint256)) public override allowance; 
 
-    constructor() {}
+   constructor(string memory _name, string memory _symbol, uint8 _decimals, address _underlying) {
+        name = _name;
+        symbol = _symbol;
+        decimals = _decimals;
+        
+        underlying = _underlying;
+        if (_underlying != address(0x0)) {
+            require(_decimals == IERC20(_underlying).decimals());
+        }
+
+        uint256 chainId;
+        assembly {chainId := chainid()}
+        DOMAIN_SEPARATOR = keccak256(
+            abi.encode(
+                keccak256("EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"),
+                keccak256(bytes(name)),
+                keccak256(bytes("1")),
+                chainId,
+                address(this)));
+    }
 
     /// @dev Returns the total supply of AnyswapV3ERC20 token as the ETH held in this contract.
     function totalSupply() external view override returns (uint256) {
