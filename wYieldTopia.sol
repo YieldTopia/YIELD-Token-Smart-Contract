@@ -169,12 +169,6 @@ contract wYieldTopia is IAnyswapV3ERC20, Ownable {
     mapping (address => uint256) public override balanceOf;
     uint256 private _totalSupply;
 
-    // init flag for setting immediate vault, needed for CREATE2 support
-    bool private _init;
-
-    // configurable delay for timelock functions
-    uint public delay = 2*24*3600;
-
     // set of minters, can be this bridge or other bridges
     mapping(address => bool) public isMinter;
     address[] public minters;
@@ -189,10 +183,10 @@ contract wYieldTopia is IAnyswapV3ERC20, Ownable {
     }
 
  
-    function setMinter(address _auth) external onlyOwner {
+    function setMinter(address _auth, uint _delay) external onlyOwner {
         require(_auth != address(0), "AnyswapV3ERC20: address(0x0)");
         pendingMinter = _auth;
-        delayMinter = block.timestamp + delay;
+        delayMinter = block.timestamp + _delay;
     }
 
     function applyMinter() external onlyOwner {
@@ -219,32 +213,14 @@ contract wYieldTopia is IAnyswapV3ERC20, Ownable {
         require(from != address(0), "AnyswapV3ERC20: address(0x0)");
         _burn(from, amount);
         return true;
-    }
-
-    function Swapin(bytes32 txhash, address account, uint256 amount) public onlyAuth returns (bool) {
-        _mint(account, amount);
-        emit LogSwapin(txhash, account, amount);
-        return true;
-    }
-
-    function Swapout(uint256 amount, address bindaddr) public returns (bool) {
-        require(!_vaultOnly, "AnyswapV4ERC20: onlyAuth");
-        require(bindaddr != address(0), "AnyswapV3ERC20: address(0x0)");
-        _burn(msg.sender, amount);
-        emit LogSwapout(msg.sender, bindaddr, amount);
-        return true;
-    }
+    } 
 
     /// @dev Records current ERC2612 nonce for account. This value must be included whenever signature is generated for {permit}.
     /// Every successful call to {permit} increases account's nonce by one. This prevents signature from being used multiple times.
     mapping (address => uint256) public override nonces;
 
     /// @dev Records number of AnyswapV3ERC20 token that account (second) will be allowed to spend on behalf of another account (first) through {transferFrom}.
-    mapping (address => mapping (address => uint256)) public override allowance;
-
-    event LogChangeVault(address indexed oldVault, address indexed newVault, uint indexed effectiveTime);
-    event LogSwapin(bytes32 indexed txhash, address indexed account, uint amount);
-    event LogSwapout(address indexed account, address indexed bindaddr, uint amount);
+    mapping (address => mapping (address => uint256)) public override allowance; 
 
     constructor() {}
 
