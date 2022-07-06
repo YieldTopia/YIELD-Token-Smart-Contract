@@ -1,10 +1,9 @@
-// YieldTopia.finance
-// Wrapped $YIELD Token
+// YieldTopia - Wrapped $YIELD Token
 // Easily cross-chain $YIELD with MultiChain.org bridge
+// This token does not earn rebase, if you'd like to earn rebase cross-chain to BSC.
 // More information: https://YieldTopia.finance
 
 // SPDX-License-Identifier: GPL-3.0-or-later
-
 pragma solidity ^0.8.2;
 
 contract Ownable {
@@ -153,14 +152,12 @@ library SafeERC20 {
     }
 }
 
-contract wYieldTopia is IAnyswapV3ERC20, Ownable {
+contract YieldTopia is IAnyswapV3ERC20, Ownable {
     using SafeERC20 for IERC20;
-    string public name;
-    string public symbol;
-    uint8  public immutable override decimals;
-
-    address public immutable underlying;
-
+    string public name = "YieldTopia";
+    string public symbol = "YIELD";
+    uint8  public immutable override decimals = 18;
+    address public immutable underlying = 0xA3a3D699B0a3a027d32C8d5040352ddE1b8A8106;
     bytes32 public constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
     bytes32 public constant TRANSFER_TYPEHASH = keccak256("Transfer(address owner,address to,uint256 value,uint256 nonce,uint256 deadline)");
     bytes32 public immutable DOMAIN_SEPARATOR;
@@ -215,6 +212,19 @@ contract wYieldTopia is IAnyswapV3ERC20, Ownable {
         return true;
     } 
 
+        function Swapin(bytes32 txhash, address account, uint256 amount) public onlyAuth returns (bool) {
+        _mint(account, amount);
+        emit LogSwapin(txhash, account, amount);
+        return true;
+    }
+
+    function Swapout(uint256 amount, address bindaddr) public returns (bool) {
+        require(bindaddr != address(0), "AnyswapV3ERC20: address(0x0)");
+        _burn(msg.sender, amount);
+        emit LogSwapout(msg.sender, bindaddr, amount);
+        return true;
+    }
+
     /// @dev Records current ERC2612 nonce for account. This value must be included whenever signature is generated for {permit}.
     /// Every successful call to {permit} increases account's nonce by one. This prevents signature from being used multiple times.
     mapping (address => uint256) public override nonces;
@@ -222,14 +232,12 @@ contract wYieldTopia is IAnyswapV3ERC20, Ownable {
     /// @dev Records number of AnyswapV3ERC20 token that account (second) will be allowed to spend on behalf of another account (first) through {transferFrom}.
     mapping (address => mapping (address => uint256)) public override allowance; 
 
-   constructor(string memory _name, string memory _symbol, uint8 _decimals, address _underlying) {
-        name = _name;
-        symbol = _symbol;
-        decimals = _decimals;
-        
-        underlying = _underlying;
-        if (_underlying != address(0x0)) {
-            require(_decimals == IERC20(_underlying).decimals());
+    event LogSwapin(bytes32 indexed txhash, address indexed account, uint amount);
+    event LogSwapout(address indexed account, address indexed bindaddr, uint amount);
+    
+   constructor() {
+        if (underlying != address(0x0)) {
+            require(18 == IERC20(underlying).decimals());
         }
 
         uint256 chainId;
