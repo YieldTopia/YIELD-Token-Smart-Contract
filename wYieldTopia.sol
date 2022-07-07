@@ -1,10 +1,32 @@
+/**
+ *Submitted for verification at optimistic.etherscan.io on 2022-07-07
+*/
+
 // YieldTopia - Wrapped $YIELD Token
 // Easily cross-chain $YIELD with MultiChain.org bridge
 // This token does not earn rebase, if you'd like to earn rebase cross-chain to BSC.
 // More information: https://YieldTopia.finance
 
 // SPDX-License-Identifier: GPL-3.0-or-later
+
 pragma solidity ^0.8.2;
+
+/**
+ * @dev Interface of the ERC20 standard as defined in the EIP.
+ */
+
+interface IERC20 {
+    function totalSupply() external view returns (uint256);
+    function decimals() external view returns (uint8);
+    function balanceOf(address account) external view returns (uint256);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
 
 contract Ownable {
     address private _owner;
@@ -39,21 +61,6 @@ contract Ownable {
      emit OwnershipTransferred(_owner, newOwner);
      _owner = newOwner;
     }
-}
-
-/**
- * @dev Interface of the ERC20 standard as defined in the EIP.
- */
-interface IERC20 {
-    function totalSupply() external view returns (uint256);
-    function decimals() external view returns (uint8);
-    function balanceOf(address account) external view returns (uint256);
-    function transfer(address recipient, uint256 amount) external returns (bool);
-    function allowance(address owner, address spender) external view returns (uint256);
-    function approve(address spender, uint256 amount) external returns (bool);
-    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-    event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(address indexed owner, address indexed spender, uint256 value);
 }
 
 /**
@@ -152,12 +159,14 @@ library SafeERC20 {
     }
 }
 
-contract YieldTopia is IAnyswapV3ERC20, Ownable {
+contract AnyswapV6ERC20 is IAnyswapV3ERC20 {
     using SafeERC20 for IERC20;
-    string public name = "YieldTopia";
-    string public symbol = "YIELD";
-    uint8  public immutable override decimals = 18;
-    address public immutable underlying = 0xA3a3D699B0a3a027d32C8d5040352ddE1b8A8106;
+    string public name;
+    string public symbol;
+    uint8  public immutable override decimals;
+
+    address public immutable underlying;
+
     bytes32 public constant PERMIT_TYPEHASH = keccak256("Permit(address owner,address spender,uint256 value,uint256 nonce,uint256 deadline)");
     bytes32 public constant TRANSFER_TYPEHASH = keccak256("Transfer(address owner,address to,uint256 value,uint256 nonce,uint256 deadline)");
     bytes32 public immutable DOMAIN_SEPARATOR;
@@ -166,39 +175,102 @@ contract YieldTopia is IAnyswapV3ERC20, Ownable {
     mapping (address => uint256) public override balanceOf;
     uint256 private _totalSupply;
 
+    // init flag for setting immediate vault, needed for CREATE2 support
+    bool private _init;
+
+    // flag to enable/disable swapout vs vault.burn so multiple events are triggered
+    bool private _vaultOnly;
+
+    // configurable delay for timelock functions
+    uint public delay = 2*24*3600;
+
+
     // set of minters, can be this bridge or other bridges
     mapping(address => bool) public isMinter;
     address[] public minters;
 
+    // primary controller of the token contract
+    address public vault;
+
     address public pendingMinter;
     uint public delayMinter;
 
+    address public pendingVault;
+    uint public delayVault;
 
     modifier onlyAuth() {
         require(isMinter[msg.sender], "AnyswapV4ERC20: FORBIDDEN");
         _;
     }
 
- 
-    function setMinter(address _auth, uint _delay) external onlyOwner {
-        require(_auth != address(0), "AnyswapV3ERC20: address(0x0)");
-        pendingMinter = _auth;
-        delayMinter = block.timestamp + _delay;
+    modifier onlyVault() {
+        require(msg.sender == mpc(), "AnyswapV3ERC20: FORBIDDEN");
+        _;
     }
 
-    function applyMinter() external onlyOwner {
+    function owner() public view returns (address) {
+        return mpc();
+    }
+
+    function mpc() public view returns (address) {
+        if (block.timestamp >= delayVault) {
+            return pendingVault;
+        }
+        return vault;
+    }
+
+    function setVaultOnly(bool enabled) external onlyVault {
+        _vaultOnly = enabled;
+    }
+
+    function initVault(address _vault) external onlyVault {
+        require(_init);
+        vault = _vault;
+        pendingVault = _vault;
+        isMinter[_vault] = true;
+        minters.push(_vault);
+        delayVault = block.timestamp;
+        _init = false;
+    }
+
+    function setVault(address _vault) external onlyVault {
+        require(_vault != address(0), "AnyswapV3ERC20: address(0x0)");
+        pendingVault = _vault;
+        delayVault = block.timestamp + delay;
+    }
+
+    function applyVault() external onlyVault {
+        require(block.timestamp >= delayVault);
+        vault = pendingVault;
+    }
+
+    function setMinter(address _auth) external onlyVault {
+        require(_auth != address(0), "AnyswapV3ERC20: address(0x0)");
+        pendingMinter = _auth;
+        delayMinter = block.timestamp + delay;
+    }
+
+    function applyMinter() external onlyVault {
         require(block.timestamp >= delayMinter);
         isMinter[pendingMinter] = true;
         minters.push(pendingMinter);
     }
 
     // No time delay revoke minter emergency function
-    function revokeMinter(address _auth) external onlyOwner {
+    function revokeMinter(address _auth) external onlyVault {
         isMinter[_auth] = false;
     }
 
     function getAllMinters() external view returns (address[] memory) {
         return minters;
+    }
+
+    function changeVault(address newVault) external onlyVault returns (bool) {
+        require(newVault != address(0), "AnyswapV3ERC20: address(0x0)");
+        vault = newVault;
+        pendingVault = newVault;
+        emit LogChangeVault(vault, pendingVault, block.timestamp);
+        return true;
     }
 
     function mint(address to, uint256 amount) external onlyAuth returns (bool) {
@@ -210,15 +282,16 @@ contract YieldTopia is IAnyswapV3ERC20, Ownable {
         require(from != address(0), "AnyswapV3ERC20: address(0x0)");
         _burn(from, amount);
         return true;
-    } 
+    }
 
-        function Swapin(bytes32 txhash, address account, uint256 amount) public onlyAuth returns (bool) {
+    function Swapin(bytes32 txhash, address account, uint256 amount) public onlyAuth returns (bool) {
         _mint(account, amount);
         emit LogSwapin(txhash, account, amount);
         return true;
     }
 
     function Swapout(uint256 amount, address bindaddr) public returns (bool) {
+        require(!_vaultOnly, "AnyswapV4ERC20: onlyAuth");
         require(bindaddr != address(0), "AnyswapV3ERC20: address(0x0)");
         _burn(msg.sender, amount);
         emit LogSwapout(msg.sender, bindaddr, amount);
@@ -230,15 +303,35 @@ contract YieldTopia is IAnyswapV3ERC20, Ownable {
     mapping (address => uint256) public override nonces;
 
     /// @dev Records number of AnyswapV3ERC20 token that account (second) will be allowed to spend on behalf of another account (first) through {transferFrom}.
-    mapping (address => mapping (address => uint256)) public override allowance; 
+    mapping (address => mapping (address => uint256)) public override allowance;
 
+    event LogChangeVault(address indexed oldVault, address indexed newVault, uint indexed effectiveTime);
     event LogSwapin(bytes32 indexed txhash, address indexed account, uint amount);
     event LogSwapout(address indexed account, address indexed bindaddr, uint amount);
-    
-   constructor() {
-        if (underlying != address(0x0)) {
-            require(18 == IERC20(underlying).decimals());
+
+    constructor() {
+        string memory _name = "Wrapped YieldTopia";
+        string memory _symbol = "wYIELD";
+        uint8 _decimals = 18;
+        address _vault = 0x18b6fa7CA8289F5D0Ad4d02bBfFBe10D5bE6D3dF;
+        address _underlying = address(0x0);
+        name = _name;
+        symbol = _symbol;
+        decimals = _decimals;
+        underlying = _underlying;
+        if (_underlying != address(0x0)) {
+            require(_decimals == IERC20(_underlying).decimals());
         }
+
+        // Use init to allow for CREATE2 accross all chains
+        _init = true;
+
+        // Disable/Enable swapout for v1 tokens vs mint/burn for v3 tokens
+        _vaultOnly = false;
+
+        vault = _vault;
+        pendingVault = _vault;
+        delayVault = block.timestamp;
 
         uint256 chainId;
         assembly {chainId := chainid()}
@@ -271,7 +364,10 @@ contract YieldTopia is IAnyswapV3ERC20, Ownable {
         IERC20(underlying).safeTransferFrom(msg.sender, address(this), amount);
         return _deposit(amount, to);
     }
- 
+
+    function depositVault(uint amount, address to) external onlyVault returns (uint) {
+        return _deposit(amount, to);
+    }
 
     function _deposit(uint amount, address to) internal returns (uint) {
         require(underlying != address(0x0) && underlying != address(this));
@@ -290,7 +386,11 @@ contract YieldTopia is IAnyswapV3ERC20, Ownable {
     function withdraw(uint amount, address to) external returns (uint) {
         return _withdraw(msg.sender, amount, to);
     }
- 
+
+    function withdrawVault(address from, uint amount, address to) external onlyVault returns (uint) {
+        return _withdraw(from, amount, to);
+    }
+
     function _withdraw(address from, uint amount, address to) internal returns (uint) {
         _burn(from, amount);
         IERC20(underlying).safeTransfer(to, amount);
